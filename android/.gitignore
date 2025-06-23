@@ -1,5 +1,7 @@
 gradle-wrapper.jar
 /.gradle
+android/app/google-services.json
+ios/Runner/Info.plist
 /captures/
 /gradlew
 /gradlew.bat
