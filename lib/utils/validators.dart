@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:soch/models/user_model.dart';
 import 'package:soch/screens/auth/login_screen.dart';
-import 'package:soch/screens/navigator_screen.dart';
+import 'package:soch/screens/home/navigator_screen.dart';
 import 'package:soch/services/auth_services.dart';
 import 'package:soch/services/user_services.dart';
 
