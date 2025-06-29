@@ -5,8 +5,8 @@ class UserModel {
   final String username;
   final String email;
   final String profilepicurl;
-  final List followers;
-  final List following;
+  final List<String> followers;
+  final List<String> following;
 
   const UserModel({
     required this.uid,

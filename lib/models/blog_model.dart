@@ -4,76 +4,82 @@ class BlogModel {
   final String blogid;
   final String authorid;
   final String authorname;
+  final String authorpicurl;
   final String title;
   final String content;
   final DateTime timestamp;
-  final List<String> likes; // store user-uids
-  final List<String> comments; // store comment-ids (optional)
+  final List<String> likes;
+  final int commentCount;
 
   const BlogModel({
     required this.blogid,
     required this.authorid,
     required this.authorname,
+    required this.authorpicurl,
     required this.title,
     required this.content,
     required this.timestamp,
     this.likes = const [],
-    this.comments = const [],
+    this.commentCount = 0,
   });
 
-  /* ---------- Firestore helpers ---------- */
-
-  /// create from an already-fetched document
   factory BlogModel.fromDoc(DocumentSnapshot doc) {
     final d = doc.data()! as Map<String, dynamic>;
+
+    int countFromLegacy = (d['comments'] is List)
+        ? (d['comments'] as List).length
+        : 0;
+
     return BlogModel(
       blogid: d['blogId'] ?? doc.id,
       authorid: d['authorId'] ?? '',
       authorname: d['authorName'] ?? '',
+      authorpicurl: d['authorPicUrl'] ?? '',
       title: d['title'] ?? '',
       content: d['content'] ?? '',
       timestamp: (d['timestamp'] as Timestamp).toDate(),
       likes: List<String>.from(d['likes'] ?? []),
-      comments: List<String>.from(d['comments'] ?? []),
+      commentCount: (d['commentCount'] is int)
+          ? d['commentCount']
+          : countFromLegacy,
     );
   }
 
-  /// for writing / updating
   Map<String, dynamic> toMap() => {
     'blogId': blogid,
     'authorId': authorid,
     'authorName': authorname,
+    'authorPicUrl': authorpicurl,
     'title': title,
     'content': content,
     'timestamp': Timestamp.fromDate(timestamp),
     'likes': likes,
-    'comments': comments,
+    'commentCount': commentCount,
   };
-
-  /* ---------- convenience ---------- */
 
   BlogModel copyWith({
     String? blogid,
     String? authorid,
     String? authorname,
+    String? authorpicurl,
     String? title,
     String? content,
     DateTime? timestamp,
     List<String>? likes,
-    List<String>? comments,
+    int? commentCount,
   }) {
     return BlogModel(
       blogid: blogid ?? this.blogid,
       authorid: authorid ?? this.authorid,
       authorname: authorname ?? this.authorname,
+      authorpicurl: authorpicurl ?? this.authorpicurl,
       title: title ?? this.title,
       content: content ?? this.content,
       timestamp: timestamp ?? this.timestamp,
       likes: likes ?? this.likes,
-      comments: comments ?? this.comments,
+      commentCount: commentCount ?? this.commentCount,
     );
   }
 
   int get likeCount => likes.length;
-  int get commentCount => comments.length;
 }

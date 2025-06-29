@@ -56,4 +56,41 @@ class UserService {
       'profilepicurl': imageUrl,
     });
   }
+
+  Future<bool> isFollowing(String otherUid) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return false;
+    final snap = await _col.doc(me.uid).get();
+    final following = List<String>.from(snap.get('following') ?? []);
+    return following.contains(otherUid);
+  }
+
+  Future<void> toggleFollow(String otherUid) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null || me.uid == otherUid) return;
+
+    final myRef = _col.doc(me.uid);
+    final otherRef = _col.doc(otherUid);
+
+    final mySnap = await myRef.get();
+    final following = List<String>.from(mySnap.get('following') ?? []);
+
+    final alreadyFollowing = following.contains(otherUid);
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    batch.update(myRef, {
+      'following': alreadyFollowing
+          ? FieldValue.arrayRemove([otherUid])
+          : FieldValue.arrayUnion([otherUid]),
+    });
+
+    batch.update(otherRef, {
+      'followers': alreadyFollowing
+          ? FieldValue.arrayRemove([me.uid])
+          : FieldValue.arrayUnion([me.uid]),
+    });
+
+    await batch.commit();
+  }
 }

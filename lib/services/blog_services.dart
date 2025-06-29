@@ -1,79 +1,77 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:soch/services/user_services.dart';
 import '../models/blog_model.dart';
 
 class BlogService {
-  final _firestore = FirebaseFirestore.instance;
+  final _col = FirebaseFirestore.instance.collection('blogs');
 
-  // Create a new blog
-  Future<void> createBlog(BlogModel blog) async {
-    try {
-      await _firestore.collection('blogs').doc(blog.blogid).set({
-        'blogId': blog.blogid,
-        'authorId': blog.authorid,
-        'authorName': blog.authorname,
-        'title': blog.title,
-        'content': blog.content,
-        'timestamp': blog.timestamp,
-        'likes': blog.likes,
-        'comments': [], // Init empty list or use subcollection
-      });
-    } catch (e) {
-      print('Error creating blog: $e');
+  Future<String?> createBlog({
+    required String title,
+    required String content,
+  }) async {
+    final user = await UserService().getCurrentUser();
+    if (user == null) return null; // not signed in
+
+    final now = DateTime.now();
+    final ref = await _col.add({
+      'authorId': user.uid,
+      'authorName': user.username,
+      'authorPicUrl': user.profilepicurl,
+      'title': title,
+      'content': content,
+      'timestamp': Timestamp.fromDate(now),
+      'likes': <String>[],
+      'comments': <String>[],
+    });
+
+    await ref.update({'blogId': ref.id});
+    return ref.id;
+  }
+
+  Future<List<BlogModel>> fetchAllBlogs() async {
+    final snap = await _col.orderBy('timestamp', descending: true).get();
+    return snap.docs.map(BlogModel.fromDoc).toList();
+  }
+
+  Stream<List<BlogModel>> streamAllBlogs() {
+    return _col
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((q) => q.docs.map(BlogModel.fromDoc).toList());
+  }
+
+  Future<List<BlogModel>> fetchBlogsByAuthor(String uid) async {
+    final snap = await _col
+        .where('authorId', isEqualTo: uid)
+        .orderBy('timestamp', descending: true)
+        .get();
+    return snap.docs.map(BlogModel.fromDoc).toList();
+  }
+
+  Future<void> updateBlog({
+    required String blogId,
+    String? title,
+    String? content,
+  }) async {
+    final data = <String, dynamic>{};
+    if (title != null) data['title'] = title;
+    if (content != null) data['content'] = content;
+    if (data.isNotEmpty) {
+      await _col.doc(blogId).update(data);
     }
   }
 
-  // Fetch all blogs
-  Future<List<BlogModel>> getAllBlogs() async {
-    try {
-      final snapshot = await _firestore
-          .collection('blogs')
-          .orderBy('timestamp', descending: true)
-          .get();
+  Future<void> deleteBlog(String blogId) => _col.doc(blogId).delete();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return BlogModel(
-          blogid: data['blogId'],
-          authorid: data['authorId'],
-          authorname: data['authorName'],
-          title: data['title'],
-          content: data['content'],
-          timestamp: (data['timestamp'] as Timestamp).toDate(),
-          likes: List.from(data['likes']),
-          comments: List.from(data['comments']),
-        );
-      }).toList();
-    } catch (e) {
-      print('Error fetching blogs: $e');
-      return [];
-    }
-  }
-
-  // Fetch blogs by user
-  Future<List<BlogModel>> getBlogsByUser(String uid) async {
-    try {
-      final snapshot = await _firestore
-          .collection('blogs')
-          .where('authorId', isEqualTo: uid)
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return BlogModel(
-          blogid: data['blogId'],
-          authorid: data['authorId'],
-          authorname: data['authorName'],
-          title: data['title'],
-          content: data['content'],
-          timestamp: (data['timestamp'] as Timestamp).toDate(),
-          likes: List.from(data['likes']),
-          comments: List.from(data['comments']),
-        );
-      }).toList();
-    } catch (e) {
-      print('Error fetching user blogs: $e');
-      return [];
-    }
+  Future<void> toggleLike({
+    required String blogId,
+    required String uid,
+    required bool alreadyLiked,
+  }) {
+    return _col.doc(blogId).update({
+      'likes': alreadyLiked
+          ? FieldValue.arrayRemove([uid])
+          : FieldValue.arrayUnion([uid]),
+    });
   }
 }
