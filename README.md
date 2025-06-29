@@ -1,4 +1,4 @@
-```markdown
+
 # SOCH. - Social Blogging App 📱✨
 
 *A minimalist Flutter + Firebase blogging platform where users share thoughts, connect, and engage.*
@@ -45,9 +45,9 @@
 ```
 ## 📦 APK File
 
-[Download Latest APK](https://drive.google.com/file/d/1eTGPfr-W2SXEu4wgpgndqAWc5DoKMs4t/view?usp=sharing) 📲  
+[Download Latest APK](https://drive.google.com/uc?export=download&id=1eTGPfr-W2SXEu4wgpgndqAWc5DoKMs4t) 📲  
 *(Tap to download & install on your Android device)*
----
+
 
 ## 📥 Installation
 ```bash
