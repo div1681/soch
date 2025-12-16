@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:soch/services/blog_services.dart';
 
 class CreateBlogScreen extends StatefulWidget {
@@ -11,19 +12,17 @@ class CreateBlogScreen extends StatefulWidget {
 
 class _CreateBlogScreenState extends State<CreateBlogScreen> {
   final _titleCtrl = TextEditingController();
+  final _categoryCtrl = TextEditingController(); 
   final _contentCtrl = TextEditingController();
   final _blogSvc = BlogService();
   bool _saving = false;
-
-  static const _bgColor = Color(0xFFFDFDFD);
-  static const _textColor = Color(0xFF202124);
-  static const _accentColor = Color(0xFFB22222);
 
   Future<void> _submit() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     final title = _titleCtrl.text.trim();
+    final category = _categoryCtrl.text.trim();
     final content = _contentCtrl.text.trim();
 
     if (title.isEmpty || content.isEmpty) {
@@ -34,76 +33,88 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
     }
 
     setState(() => _saving = true);
-    await _blogSvc.createBlog(title: title, content: content);
+    await _blogSvc.createBlog(title: title, content: content, category: category);
     if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: _bgColor,
-
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: _bgColor,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: _textColor),
-        title: const Text(
-          'New Post',
-          style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold),
+        leading: IconButton(
+          icon: Icon(Icons.close, color: theme.iconTheme.color),
+          onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: ElevatedButton(
+              onPressed: _saving ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+              ),
+              child: _saving 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Publish', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+        ],
       ),
-
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _accentColor,
-        foregroundColor: Colors.white,
-        onPressed: _saving ? null : _submit,
-        icon: const Icon(Icons.send),
-        label: const Text('Post'),
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             TextField(
               controller: _titleCtrl,
               textInputAction: TextInputAction.next,
-              style: const TextStyle(color: _textColor),
+              style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: theme.textTheme.titleLarge?.color),
               decoration: InputDecoration(
-                labelText: 'Title',
-                labelStyle: const TextStyle(color: _textColor),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _accentColor),
-                ),
+                hintText: 'Title',
+                border: InputBorder.none,
+                hintStyle: GoogleFonts.outfit(color: theme.hintColor, fontSize: 24, fontWeight: FontWeight.bold),
               ),
+              maxLines: null,
             ),
-            const SizedBox(height: 16),
-            Expanded(
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: TextField(
-                controller: _contentCtrl,
-                style: const TextStyle(color: _textColor),
+                controller: _categoryCtrl,
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
-                  labelText: 'Content',
-                  alignLabelWithHint: true,
-                  labelStyle: const TextStyle(color: _textColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: _accentColor),
-                  ),
+                  hintText: 'Category (Optional)',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: theme.hintColor, fontSize: 14),
+                  isDense: true,
                 ),
-                minLines: 12,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
               ),
             ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _contentCtrl,
+              style: TextStyle(fontSize: 18, height: 1.6, color: theme.textTheme.bodyLarge?.color),
+              decoration: InputDecoration(
+                hintText: 'Tell your story...',
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: theme.hintColor, fontSize: 18),
+              ),
+              maxLines: null,
+              minLines: 15,
+            ),
+             const SizedBox(height: 100),
           ],
         ),
       ),

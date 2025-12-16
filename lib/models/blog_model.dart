@@ -10,6 +10,7 @@ class BlogModel {
   final DateTime timestamp;
   final List<String> likes;
   final int commentCount;
+  final String category;
 
   const BlogModel({
     required this.blogid,
@@ -21,6 +22,7 @@ class BlogModel {
     required this.timestamp,
     this.likes = const [],
     this.commentCount = 0,
+    this.category = '',
   });
 
   factory BlogModel.fromDoc(DocumentSnapshot doc) {
@@ -42,6 +44,7 @@ class BlogModel {
       commentCount: (d['commentCount'] is int)
           ? d['commentCount']
           : countFromLegacy,
+      category: d['category'] ?? '',
     );
   }
 
@@ -55,6 +58,7 @@ class BlogModel {
     'timestamp': Timestamp.fromDate(timestamp),
     'likes': likes,
     'commentCount': commentCount,
+    'category': category,
   };
 
   BlogModel copyWith({

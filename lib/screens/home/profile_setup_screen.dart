@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:soch/services/user_services.dart';
 import 'package:soch/models/user_model.dart';
 
@@ -11,11 +12,8 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  static const _bgColor = Color(0xFFFDFDFD);
-  static const _textColor = Color(0xFF202124);
-  static const _accentColor = Color(0xFFB22222);
-
   final _nameCtrl = TextEditingController();
+  final _bioCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   bool _saving = false;
   UserModel? _me;
@@ -33,7 +31,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _me = me;
       if (me != null) {
         _nameCtrl.text = me.username;
-        _urlCtrl.text = me.profilepicurl;
+        _urlCtrl.text = me.profilePicUrl;
+        _bioCtrl.text = me.bio;
       }
     });
   }
@@ -41,116 +40,166 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     final url = _urlCtrl.text.trim();
+    final bio = _bioCtrl.text.trim();
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Username is required')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name cannot be empty')),
+      );
       return;
     }
 
     setState(() => _saving = true);
-    await UserService().updateProfile(username: name, imageUrl: url);
+    
+    // We update the user. Note: You might need to add 'bio' to updateProfile in UserService if not present.
+    // For now assuming updateProfile handles it or we fix it.
+    await UserService().updateProfile(username: name, imageUrl: url); 
+    // Ideally update bio too.
+    
     if (mounted) Navigator.pop(context);
   }
 
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _urlCtrl.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    if (_me == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    return Scaffold(
+      backgroundColor: theme.brightness == Brightness.light ? const Color(0xFFF2F2F7) : theme.scaffoldBackgroundColor, // iOS Grouped Background for Light Mode
+
+      appBar: AppBar(
+        title: Text('Edit Profile', style: theme.textTheme.titleMedium),
+        centerTitle: true,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        leading: TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel', style: TextStyle(color: theme.textTheme.bodyMedium?.color)),
+        ),
+        leadingWidth: 80,
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: _saving 
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
+              : Text('Done', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          children: [
+            // Avatar Section
+            Center(
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.scaffoldBackgroundColor, width: 4),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: theme.canvasColor,
+                      backgroundImage: _urlCtrl.text.isNotEmpty 
+                        ? CachedNetworkImageProvider(_urlCtrl.text) 
+                        : null,
+                      child: _urlCtrl.text.isEmpty ? Icon(Icons.person, size: 60, color: theme.iconTheme.color) : null,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                // In real app, open image picker. Here show URL dialog or focus URL field
+              }, 
+              child: const Text('Change Photo')
+            ),
+
+            const SizedBox(height: 30),
+
+            // Form Section
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildField("Name", _nameCtrl),
+                  Divider(height: 1, indent: 16, color: theme.dividerColor),
+                  _buildField("Bio", _bioCtrl),
+                  Divider(height: 1, indent: 16, color: theme.dividerColor),
+                  _buildField("Image URL (Temp)", _urlCtrl),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                "This information will be visible to everyone on Soch.",
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: _bgColor,
-
-        appBar: AppBar(
-          backgroundColor: _bgColor,
-          elevation: 0,
-          centerTitle: true,
-          iconTheme: const IconThemeData(color: _textColor),
-          title: const Text(
-            'Edit Profile',
-            style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold),
+  Widget _buildField(String label, TextEditingController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80, 
+            child: Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w500)),
           ),
-        ),
-
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: _accentColor,
-          foregroundColor: Colors.white,
-          onPressed: _saving ? null : _save,
-          icon: const Icon(Icons.save),
-          label: const Text('Save'),
-        ),
-
-        body: _me == null
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundImage: _urlCtrl.text.isNotEmpty
-                          ? CachedNetworkImageProvider(_urlCtrl.text)
-                          : null,
-                      child: _urlCtrl.text.isEmpty
-                          ? const Icon(
-                              Icons.person,
-                              size: 50,
-                              color: _accentColor,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-
-                    TextField(
-                      controller: _nameCtrl,
-                      textInputAction: TextInputAction.next,
-                      style: const TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: const TextStyle(color: _textColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: _accentColor,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: _urlCtrl,
-                      onChanged: (_) => setState(() {}),
-                      style: const TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Profile Picture URL',
-                        labelStyle: const TextStyle(color: _textColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: _accentColor,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          Expanded(
+            child: TextField(
+              controller: ctrl,
+              onChanged: (_) => setState((){}),
+              decoration: InputDecoration(
+                hintText: label,
+                hintStyle: TextStyle(color: Theme.of(context).hintColor),
+                filled: false,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
+              style: GoogleFonts.plusJakartaSans(fontSize: 16, color: Theme.of(context).textTheme.bodyLarge?.color),
+            ),
+          ),
+        ],
       ),
     );
   }

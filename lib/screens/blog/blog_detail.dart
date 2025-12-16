@@ -2,7 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:vibration/vibration.dart';
+import 'package:soch/utils/app_theme.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../models/blog_model.dart';
 import '../../services/blog_services.dart';
 import '../../services/user_services.dart';
@@ -18,13 +24,16 @@ class BlogDetailScreen extends StatefulWidget {
   State<BlogDetailScreen> createState() => _BlogDetailScreenState();
 }
 
-class _BlogDetailScreenState extends State<BlogDetailScreen> {
+class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerProviderStateMixin {
   final _blogSvc = BlogService();
   final _userSvc = UserService();
   final _cmtSvc = CommentService();
 
   late final Stream<BlogModel> _blog$;
   String? _uid;
+  bool? _isFollowing;
+  AnimationController? _followAnimCtrl;
+  Animation<double>? _followScale;
 
   @override
   void initState() {
@@ -35,93 +44,131 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
         .snapshots()
         .map(BlogModel.fromDoc);
     _uid = FirebaseAuth.instance.currentUser?.uid;
+    _checkFollowStatus(); 
+    
+    _followAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 150), lowerBound: 0.8, upperBound: 1.0);
+    _followScale = CurvedAnimation(parent: _followAnimCtrl!, curve: Curves.easeOut);
+    _followAnimCtrl!.value = 1.0;
   }
 
-  Widget _followBtn(String authorId) {
-    if (_uid == null || _uid == authorId) return const SizedBox.shrink();
-    return FutureBuilder<bool>(
-      future: _userSvc.isFollowing(authorId),
-      builder: (c, s) {
-        final followed = s.data ?? false;
-        return TextButton(
-          onPressed: () async {
-            await _userSvc.toggleFollow(authorId);
-            setState(() {});
-          },
-          child: Text(
-            followed ? 'Unfollow' : 'Follow',
-            style: TextStyle(color: followed ? Colors.grey : Colors.blue),
-          ),
-        );
-      },
-    );
+  @override
+  void dispose() {
+    _followAnimCtrl?.dispose();
+    super.dispose();
   }
 
-  void _showAddCommentDialog(String blogId) {
-    final txt = TextEditingController();
-    bool posting = false;
+  void _checkFollowStatus() async {
+    // Only fetch if we have an authorId, which we get from the stream later.
+    // The stream builder handles the initial set.
+  }
+  
+  void _onFollowTap(String authorId) async {
+    // 1. Optimistic Update (Immediate)
+    final newVal = !(_isFollowing ?? false);
+    setState(() => _isFollowing = newVal);
+    
+    _followAnimCtrl!.reverse().then((_) => _followAnimCtrl!.forward()); 
 
-    showDialog(
+    // 2. Haptics (Safeguarded)
+    // 2. Haptics (Safeguarded)
+    if (await Vibration.hasVibrator() ?? false) {
+       Vibration.vibrate(duration: 50); // Short, sharp click
+    }
+
+    // 3. API Sync
+    await _userSvc.toggleFollow(authorId);
+  }
+
+
+  void _showAddCommentSheet(String blogId) {
+     final txt = TextEditingController();
+    
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('Add a comment'),
-          content: TextField(
-            controller: txt,
-            autofocus: true,
-            minLines: 1,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'Write something…',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          actions: [
-            TextButton(
-              onPressed: posting ? null : () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: posting || txt.text.trim().isEmpty
-                  ? null
-                  : () async {
-                      setState(() => posting = true);
-                      try {
-                        await _cmtSvc.addComment(blogId, txt.text.trim());
-                        if (mounted) Navigator.of(ctx).pop();
-                      } catch (e) {
-                        setState(() => posting = false);
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, 
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).bottomSheetTheme.backgroundColor ?? Theme.of(ctx).cardColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [BoxShadow(blurRadius: 20, color: Colors.black12)],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Share your thoughts', style: Theme.of(context).textTheme.titleLarge),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => Navigator.pop(ctx),
+                  )
+                ],
               ),
-              child: posting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Post'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: txt,
+                autofocus: true,
+                maxLines: 4,
+                minLines: 2,
+                style: GoogleFonts.plusJakartaSans(fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'What are you thinking?',
+                  hintStyle: GoogleFonts.plusJakartaSans(color: Theme.of(ctx).hintColor),
+                  filled: true,
+                  fillColor: Theme.of(ctx).inputDecorationTheme.fillColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: StatefulBuilder(
+                  builder: (context, setStateBtn) {
+                    bool posting = false;
+                    return ElevatedButton(
+                      onPressed: posting ? null : () async {
+                        if (txt.text.trim().isEmpty) return;
+                        setStateBtn(() => posting = true);
+                        try {
+                          await _cmtSvc.addComment(blogId, txt.text.trim());
+                         
+                          if (mounted && Navigator.canPop(ctx)) {
+                            Navigator.pop(ctx); 
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Comment added successfully!'), behavior: SnackBarBehavior.floating),
+                            );
+                          }
+                        } catch (e) {
+                          setStateBtn(() => posting = false);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: posting 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Post Comment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    );
+                  }
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  String _fmt(dynamic ts) =>
-      ts is Timestamp ? DateFormat('dd MMM yyyy').format(ts.toDate()) : '';
-  static const Color _bgColor = Color(0xFFFDFDFD);
-  static const Color _textColor = Color(0xFF202124);
-  static const Color _accentColor = Color(0xFFB22222);
-  static const Color _dividerColor = Color(0xFFE0E0E0);
 
   @override
   Widget build(BuildContext context) {
@@ -129,271 +176,295 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
       stream: _blog$,
       builder: (_, snap) {
         if (!snap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final blog = snap.data!;
         final liked = _uid != null && blog.likes.contains(_uid);
 
-        return Scaffold(
-          backgroundColor: _bgColor,
+         if (_isFollowing == null && _uid != blog.authorid) {
+            _userSvc.isFollowing(blog.authorid).then((val) {
+                if (mounted && _isFollowing == null) setState(() => _isFollowing = val);
+            });
+        }
 
-          // -------- AppBar ----------
-          appBar: AppBar(
-            backgroundColor: _bgColor,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: _textColor),
-            title: const SizedBox.shrink(), // no title
-            actions: _uid == blog.authorid
-                ? [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: _textColor),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditBlogScreen(blog: blog),
+        final theme = Theme.of(context);
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _showAddCommentSheet(blog.blogid),
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: Colors.white,
+            elevation: 4,
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text("Discuss"),
+          ),
+          body: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOutQuart,
+            builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
+            child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced margin to 16
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 80), // Space for Back Button
+                    
+                    if (blog.category.isNotEmpty) 
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          blog.category.toUpperCase(),
+                          style: GoogleFonts.plusJakartaSans(
+                            color: AppTheme.accent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: _accentColor),
-                      onPressed: () async {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Delete blog?'),
-                            content: const Text('This action is irreversible.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text(
-                                  'Delete',
-                                  style: TextStyle(color: _accentColor),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (ok == true) {
-                          await _blogSvc.deleteBlog(blog.blogid);
-                          if (mounted) Navigator.pop(context);
-                        }
-                      },
-                    ),
-                  ]
-                : null,
-          ),
-
-          floatingActionButton: _uid != null
-              ? FloatingActionButton.extended(
-                  backgroundColor: _accentColor,
-                  foregroundColor: Colors.white,
-                  icon: const Icon(Icons.add_comment),
-                  label: const Text('Comment'),
-                  onPressed: () => _showAddCommentDialog(blog.blogid),
-                )
-              : null,
-
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileScreen(uid: blog.authorid),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundImage: blog.authorpicurl.isNotEmpty
-                            ? CachedNetworkImageProvider(blog.authorpicurl)
-                            : null,
-                        child: blog.authorpicurl.isEmpty
-                            ? const Icon(Icons.person, color: _textColor)
-                            : null,
+              
+                    Text(
+                      blog.title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                        color: theme.textTheme.displayLarge?.color,
+                        letterSpacing: -0.5,
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    
+                    const SizedBox(height: 24),
+              
+                    // Author Row
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(uid: blog.authorid))),
+                      child: Row(
                         children: [
-                          Text(
-                            blog.authorname,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: _textColor,
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundImage: blog.authorpicurl.isNotEmpty ? CachedNetworkImageProvider(blog.authorpicurl) : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(blog.authorname, 
+                                    style: Theme.of(context).textTheme.labelLarge,
+                                    overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  timeago.format(blog.timestamp), // Time ago
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
                           ),
+                          
+                           if (_uid != blog.authorid) ...[
+                              const SizedBox(width: 8),
+                              ScaleTransition(
+                                scale: _followScale!,
+                                child: InkWell(
+                                  onTap: () => _onFollowTap(blog.authorid),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                      decoration: BoxDecoration(
+                                          color: (_isFollowing ?? false) ? theme.scaffoldBackgroundColor : theme.colorScheme.primary,
+                                          border: Border.all(color: theme.colorScheme.primary),
+                                          borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                          (_isFollowing ?? false) ? "Following" : "Follow",
+                                          style: TextStyle(
+                                              color: (_isFollowing ?? false) ? theme.colorScheme.primary : Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12
+                                          ),
+                                      ),
+                                  ),
+                                ),
+                              ),
+                          ],
+              
+                          const SizedBox(width: 12),
+                          _buildLikeButton(blog, liked),
+                        ],
+                      ),
+                    ),
+              
+                    const SizedBox(height: 32),
+              
+                    SelectableText(
+                      blog.content,
+                      style: GoogleFonts.literata( 
+                        fontSize: 18,
+                        height: 1.5, 
+                        color: theme.textTheme.bodyLarge?.color,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+              
+                    const SizedBox(height: 48),
+                    const Divider(),
+                    const SizedBox(height: 24),
+                    
+                    Text("Comments", style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 24),
+                    _buildCommentsList(blog.blogid),
+                    const SizedBox(height: 80), 
+                  ],
+                ),
+              ),
+              
+              // Content Fade Gradient (Top)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 120,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          theme.scaffoldBackgroundColor.withOpacity(1.0),
+                          theme.scaffoldBackgroundColor.withOpacity(0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Custom Floating Back Button
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                       onPressed: () => Navigator.pop(context),
+                         icon: Container(
+                           padding: const EdgeInsets.all(8),
+                           decoration: BoxDecoration(
+                             color: Theme.of(context).cardColor.withOpacity(0.8),
+                             shape: BoxShape.circle,
+                             boxShadow: [
+                               BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
+                             ]
+                           ),
+                           child: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
+                         ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      },
+    );
+  }
+
+  Widget _buildLikeButton(BlogModel blog, bool liked) {
+    return InkWell(
+      onTap: () async {
+        if (!liked) {
+          SystemSound.play(SystemSoundType.click); 
+        }
+        _blogSvc.toggleLike(blogId: blog.blogid, uid: _uid!, alreadyLiked: liked);
+      },
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: liked ? Colors.red.withOpacity(0.1) : Theme.of(context).dividerColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          children: [
+             TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 300),
+                tween: Tween(begin: 1.0, end: liked ? 1.2 : 1.0),
+                curve: Curves.elasticOut,
+                builder: (context, scale, child) {
+                  return Transform.scale(
+                    scale: liked ? scale : 1.0,
+                    child: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : Theme.of(context).iconTheme.color, size: 20),
+                  );
+                },
+             ),
+            const SizedBox(width: 6),
+            Text('${blog.likeCount}', style: TextStyle(fontWeight: FontWeight.bold, color: liked ? Colors.red : Theme.of(context).textTheme.bodyMedium?.color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentsList(String blogId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('blogs').doc(blogId).collection('comments').orderBy('timestamp', descending: true).snapshots(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) return const Text("No comments yet. Start the conversation!", style: TextStyle(color: Colors.grey));
+        
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 24),
+          itemBuilder: (context, i) {
+            final d = docs[i].data() as Map<String, dynamic>;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: d['authorPicUrl'] != null ? NetworkImage(d['authorPicUrl']) : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(d['authorName'] ?? 'Anon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(width: 8),
                           Text(
-                            DateFormat('dd MMM yyyy').format(blog.timestamp),
-                            style: const TextStyle(color: Colors.grey),
+                            d['timestamp'] != null ? DateFormat('MMM dd').format((d['timestamp'] as Timestamp).toDate()) : '',
+                            style: const TextStyle(color: Colors.grey, fontSize: 12)
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      _followBtn(blog.authorid),
+                      const SizedBox(height: 4),
+                      Text(d['content'] ?? '', style: const TextStyle(fontSize: 15, height: 1.4)),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                Text(
-                  blog.title,
-                  style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: _textColor,
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-                Container(height: 1, color: _dividerColor),
-                const SizedBox(height: 16),
-
-                Text(
-                  blog.content,
-                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                    height: 1.6,
-                    color: _textColor,
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: _uid != null
-                          ? () => _blogSvc.toggleLike(
-                              blogId: blog.blogid,
-                              uid: _uid!,
-                              alreadyLiked: liked,
-                            )
-                          : null,
-                      child: Icon(
-                        liked ? Icons.favorite : Icons.favorite_border,
-                        color: _accentColor,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('${blog.likeCount} likes'),
-                  ],
-                ),
-
-                const SizedBox(height: 32),
-                Container(height: 1, color: _dividerColor),
-
-                const Padding(
-                  padding: EdgeInsets.only(top: 12, bottom: 16),
-                  child: Text(
-                    'COMMENTS',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('blogs')
-                      .doc(blog.blogid)
-                      .collection('comments')
-                      .orderBy('timestamp', descending: true)
-                      .snapshots(),
-                  builder: (_, cSnap) {
-                    if (!cSnap.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final docs = cSnap.data!.docs;
-                    if (docs.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('No comments yet.'),
-                      );
-                    }
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: docs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 20),
-                      itemBuilder: (_, i) {
-                        final d = docs[i].data() as Map<String, dynamic>;
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                (d['authorPicUrl'] ?? '').toString().isNotEmpty
-                                ? NetworkImage(d['authorPicUrl'])
-                                : null,
-                            child: (d['authorPicUrl'] ?? '').toString().isEmpty
-                                ? const Icon(Icons.person)
-                                : null,
-                          ),
-                          title: Text(
-                            d['authorName'] ?? 'Unknown',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            d['content'] ?? '',
-                            style: const TextStyle(fontSize: 14, height: 1.4),
-                          ),
-                          trailing: Text(
-                            _fmt(d['timestamp']),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          onLongPress: () async {
-                            final canDel =
-                                _uid == d['authorId'] || _uid == blog.authorid;
-                            if (!canDel) return;
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                content: const Text('Delete this comment?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (ok == true) {
-                              await _cmtSvc.deleteComment(
-                                blog.blogid,
-                                d['commentId'],
-                              );
-                            }
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
               ],
-            ),
-          ),
+            );
+          },
         );
       },
     );

@@ -2,10 +2,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:soch/widgets/blog_tile.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:soch/widgets/skeleton_loader.dart';
+import 'package:soch/screens/blog/edit_blog.dart';
 import '../../models/user_model.dart';
 import '../../models/blog_model.dart';
 import '../../services/user_services.dart';
 import '../../services/blog_services.dart';
+import '../../services/auth_services.dart';
+import '../../services/data_seeder.dart';
+import '../../utils/constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.uid});
@@ -23,7 +29,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _saving = false;
 
   static const Color _accentColor = Color(0xFFB22222);
-  static const Color _textColor = Color(0xFF202124);
+
+  // Remove static _textColor to use theme instead
 
   @override
   Widget build(BuildContext context) {
@@ -50,10 +57,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Scaffold _buildSetupView(UserModel user) {
     _usernameCtrl.text = user.username;
-    _imageUrlCtrl.text = user.profilepicurl;
+    _imageUrlCtrl.text = user.profilePicUrl;
 
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -118,83 +126,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Scaffold _buildProfileView(UserModel user) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: theme.iconTheme.color),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+        actions: [
+          if (_isMe && false) // Hidden as per request
+            TextButton(
+               onPressed: () => Navigator.pushNamed(context, '/profile'),
+               child: Text("Edit Profile", style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.primary))
+            ),
+          const SizedBox(width: 24),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(vertical: 12), 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _profileImage(user.profilepicurl),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        user.username,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
+                      _profileImage(user.profilePicUrl),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.username,
+                              style: GoogleFonts.outfit(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: theme.textTheme.titleLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                 _stat('Followers', user.followers.length),
+                                 _stat('Following', user.following.length),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.email,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _stat('Followers', user.followers.length),
-                          const SizedBox(width: 16),
-                          _stat('Following', user.following.length),
-                        ],
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
+                  
+                  if (user.bio.isNotEmpty) ...[
+                     const SizedBox(height: 12),
+                     Text(
+                      user.bio,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ],
 
-            const SizedBox(height: 30),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              'Your Blogs',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: _textColor,
+                  const SizedBox(height: 20),
+                  
+                  // Edit Profile Button
+                  if (_isMe) 
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pushNamed(context, '/profile'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          side: BorderSide(color: theme.dividerColor),
+                        ),
+                        child: Text("Edit Profile", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+
+                  const SizedBox(height: 30),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  if (_isMe) ...[
+                    Text(
+                      'Your Blogs',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textTheme.titleLarge?.color,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 12),
 
             FutureBuilder<List<BlogModel>>(
               future: BlogService().fetchBlogsByAuthor(user.uid),
               builder: (context, blogSnap) {
                 if (blogSnap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 24), // Added padding for skeleton to match
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 3,
+                    separatorBuilder: (_, __) => const SizedBox(height: 24),
+                    itemBuilder: (_, __) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Skeleton(height: 200, width: double.infinity, cornerRadius: 12),
+                        SizedBox(height: 12),
+                        Skeleton(height: 20, width: 200),
+                        SizedBox(height: 8),
+                        Skeleton(height: 14, width: 150),
+                      ],
+                    ),
+                  );
                 }
                 final blogs = blogSnap.data ?? [];
                 if (blogs.isEmpty) {
-                  return Container(
-                    height: 120,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'You haven’t posted anything yet',
-                      style: TextStyle(color: Colors.grey),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      height: 120,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: theme.dividerColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'You haven’t posted anything yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ),
                   );
                 }
@@ -202,14 +273,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   itemCount: blogs.length,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero, // Important: No padding here
                   itemBuilder: (_, i) {
                     final blog = blogs[i];
                     final currentUid = FirebaseAuth.instance.currentUser!.uid;
                     final alreadyLike = blog.likes.contains(currentUid);
+                    final isMyBlog = currentUid == blog.authorid; 
 
                     return BlogTile(
                       blog: blog,
                       isLiked: alreadyLike,
+                      isMine: isMyBlog,
+                      onEdit: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => EditBlogScreen(blog: blog)));
+                          setState(() {}); 
+                      },
+                      onDelete: () {
+                         showDialog(
+                           context: context, 
+                           builder: (ctx) => Dialog(
+                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                             child: Padding(
+                               padding: const EdgeInsets.all(24),
+                               child: Column(
+                                 mainAxisSize: MainAxisSize.min,
+                                 children: [
+                                   const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 48),
+                                   const SizedBox(height: 16),
+                                   const Text('Delete Blog?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                   const SizedBox(height: 8),
+                                   const Text('This action cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                                   const SizedBox(height: 24),
+                                   Row(
+                                     children: [
+                                       Expanded(
+                                         child: TextButton(
+                                           onPressed: () => Navigator.pop(ctx),
+                                           style: TextButton.styleFrom(
+                                             padding: const EdgeInsets.symmetric(vertical: 12),
+                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                           ), 
+                                           child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Expanded(
+                                         child: ElevatedButton(
+                                           onPressed: () async {
+                                             Navigator.pop(ctx);
+                                             await BlogService().deleteBlog(blog.blogid);
+                                             setState(() {}); 
+                                           },
+                                           style: ElevatedButton.styleFrom(
+                                             backgroundColor: Colors.red,
+                                             padding: const EdgeInsets.symmetric(vertical: 12),
+                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                             elevation: 0,
+                                           ),
+                                           child: Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                         ),
+                                       ),
+                                     ],
+                                   )
+                                 ],
+                               ),
+                             ),
+                           ),
+                         );
+                      },
                       onTap: () => Navigator.pushNamed(
                         context,
                         '/blogDetail',
@@ -262,13 +393,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     children: [
       Text(
         '$count',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: _textColor,
+          color: Theme.of(context).textTheme.titleLarge?.color,
         ),
       ),
-      Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+      Text(label, style: TextStyle(fontSize: 14, color: Theme.of(context).textTheme.bodySmall?.color)),
     ],
   );
 }

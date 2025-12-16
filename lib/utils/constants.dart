@@ -3,21 +3,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/user_services.dart';
 import '../services/auth_services.dart';
+import 'package:soch/utils/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
-  static const Color _bgColor = Color(0xFFFDFDFD);
-  static const Color _textColor = Color(0xFF202124);
-  static const Color _accentColor = Color(0xFFB22222);
-  static const Color _dividerColor = Color(0xFFE0E0E0);
-
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final theme = Theme.of(context);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) return const Drawer(child: Center(child: Text("Not logged in")));
 
     return Drawer(
-      backgroundColor: _bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: FutureBuilder<UserModel?>(
         future: UserService().getUserById(uid),
         builder: (context, snap) {
@@ -32,8 +32,8 @@ class AppDrawer extends StatelessWidget {
                     children: [
                       Text(
                         'SOCH.',
-                        style: TextStyle(
-                          color: _accentColor,
+                        style: GoogleFonts.outfit(
+                          color: AppTheme.accent,
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 2,
@@ -42,21 +42,21 @@ class AppDrawer extends StatelessWidget {
                       const SizedBox(height: 24),
                       CircleAvatar(
                         radius: 42,
-                        backgroundColor: _accentColor.withOpacity(0.1),
+                        backgroundColor: AppTheme.accent.withOpacity(0.1),
                         backgroundImage:
-                            (user?.profilepicurl.isNotEmpty ?? false)
-                            ? NetworkImage(user!.profilepicurl)
+                            (user?.profilePicUrl.isNotEmpty ?? false)
+                            ? NetworkImage(user!.profilePicUrl)
                             : null,
-                        child: (user?.profilepicurl.isEmpty ?? true)
-                            ? Icon(Icons.person, size: 42, color: _textColor)
+                        child: (user?.profilePicUrl.isEmpty ?? true)
+                            ? Icon(Icons.person, size: 42, color: theme.iconTheme.color)
                             : null,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         user?.username ?? 'User',
-                        style: const TextStyle(
-                          color: _textColor,
-                          fontSize: 18,
+                        style: GoogleFonts.outfit(
+                          color: theme.textTheme.titleLarge?.color,
+                          fontSize: 20,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -68,7 +68,10 @@ class AppDrawer extends StatelessWidget {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      _buildDivider(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Divider(color: theme.dividerColor, thickness: 1),
+                      ),
                       _DrawerTile(
                         icon: Icons.explore,
                         label: 'Explore',
@@ -85,16 +88,28 @@ class AppDrawer extends StatelessWidget {
                           Navigator.pushNamed(context, '/profile');
                         },
                       ),
+                      // Removed Saved Stories & Drafts
+                      _DrawerTile(
+                        icon: Icons.settings_outlined,
+                        label: 'Settings',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, '/settings');
+                        },
+                      ),
                     ],
                   ),
                 ),
 
-                _buildDivider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Divider(color: theme.dividerColor, thickness: 1),
+                ),
 
                 _DrawerTile(
                   icon: Icons.logout,
                   label: 'Logout',
-                  iconColor: _accentColor,
+                  iconColor: AppTheme.accent,
                   onTap: () async {
                     Navigator.pop(context);
                     await AuthService().signOut();
@@ -103,7 +118,7 @@ class AppDrawer extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   'Made by Divyansh',
-                  style: TextStyle(color: _accentColor.withOpacity(0.9)),
+                  style: GoogleFonts.outfit(color: AppTheme.accent.withOpacity(0.9)),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -113,11 +128,6 @@ class AppDrawer extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildDivider() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 32),
-    child: Divider(color: _dividerColor, thickness: 1),
-  );
 }
 
 class _DrawerTile extends StatelessWidget {
@@ -138,13 +148,13 @@ class _DrawerTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: ListTile(
-        leading: Icon(icon, color: iconColor ?? AppDrawer._textColor),
+        leading: Icon(icon, color: iconColor ?? Theme.of(context).iconTheme.color),
         title: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppDrawer._textColor,
+            style: GoogleFonts.outfit(
+              color: Theme.of(context).textTheme.bodyLarge?.color,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -154,8 +164,8 @@ class _DrawerTile extends StatelessWidget {
         dense: true,
         horizontalTitleGap: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        hoverColor: AppDrawer._accentColor.withOpacity(0.08),
-        splashColor: AppDrawer._accentColor.withOpacity(0.1),
+        hoverColor: AppTheme.accent.withOpacity(0.08),
+        splashColor: AppTheme.accent.withOpacity(0.1),
       ),
     );
   }

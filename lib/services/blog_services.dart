@@ -8,6 +8,7 @@ class BlogService {
   Future<String?> createBlog({
     required String title,
     required String content,
+    String category = '',
   }) async {
     final user = await UserService().getCurrentUser();
     if (user == null) return null; // not signed in
@@ -16,9 +17,10 @@ class BlogService {
     final ref = await _col.add({
       'authorId': user.uid,
       'authorName': user.username,
-      'authorPicUrl': user.profilepicurl,
+      'authorPicUrl': user.profilePicUrl,
       'title': title,
       'content': content,
+      'category': category,
       'timestamp': Timestamp.fromDate(now),
       'likes': <String>[],
       'comments': <String>[],
@@ -52,10 +54,12 @@ class BlogService {
     required String blogId,
     String? title,
     String? content,
+    String? category,
   }) async {
     final data = <String, dynamic>{};
     if (title != null) data['title'] = title;
     if (content != null) data['content'] = content;
+    if (category != null) data['category'] = category;
     if (data.isNotEmpty) {
       await _col.doc(blogId).update(data);
     }

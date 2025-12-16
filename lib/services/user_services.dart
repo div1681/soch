@@ -15,7 +15,7 @@ class UserService {
         'uid': user.uid,
         'username': '',
         'email': user.email ?? '',
-        'profilepicurl': '',
+        'profilePicUrl': 'https://ui-avatars.com/api/?name=${(user.email ?? 'User').split('@')[0]}&background=random&size=200',
         'followers': [],
         'following': [],
       });
@@ -38,7 +38,9 @@ class UserService {
       uid: data['uid'] ?? '',
       username: data['username'] ?? '',
       email: data['email'] ?? '',
-      profilepicurl: data['profilepicurl'] ?? '',
+      profilePicUrl: (data['profilePicUrl'] != null && data['profilePicUrl'].toString().isNotEmpty)
+          ? data['profilePicUrl']
+          : 'https://ui-avatars.com/api/?name=${(data['username'] ?? 'User').toString().replaceAll(' ', '+')}&background=random&size=200',
       followers: List<String>.from(data['followers'] ?? []),
       following: List<String>.from(data['following'] ?? []),
     );
@@ -53,7 +55,7 @@ class UserService {
 
     await _col.doc(uid).update({
       'username': username,
-      'profilepicurl': imageUrl,
+      'profilePicUrl': imageUrl,
     });
   }
 

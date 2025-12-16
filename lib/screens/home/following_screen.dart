@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:soch/widgets/blog_tile.dart';
+import 'package:soch/widgets/skeleton_loader.dart';
 import '../../models/blog_model.dart';
 import '../../services/user_services.dart';
 import '../../services/blog_services.dart';
@@ -18,10 +21,6 @@ class _FollowingScreenState extends State<FollowingScreen> {
   final _blogSvc = BlogService();
   String? _uid;
   List<String> _following = [];
-
-  static const _bgColor = Color(0xFFFDFDFD);
-  static const _textColor = Color(0xFF202124);
-  static const _accentColor = Color(0xFFB22222);
 
   @override
   void initState() {
@@ -73,52 +72,116 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'Following',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            color: theme.textTheme.titleLarge?.color, 
+            letterSpacing: -0.5,
+          ),
+        ),
+        centerTitle: false,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: theme.iconTheme.color),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(color: theme.dividerColor.withOpacity(0.1), height: 1.0),
+        ),
+      ),
       body: StreamBuilder<List<BlogModel>>(
         stream: _combinedFollowingStream(),
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: _accentColor),
+           if (snap.connectionState == ConnectionState.waiting || !snap.hasData) {
+            return ListView.separated(
+              itemCount: 5,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, __) => _buildSkeletonItem(),
             );
           }
-          final blogs = snap.data ?? [];
+          final blogs = snap.data!;
           if (blogs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Follow someone to see their posts here.',
-                style: TextStyle(color: _textColor),
-              ),
-            );
+             return const Center(child: Text('Follow someone to see their posts here.', style: TextStyle(color: Colors.grey)));
           }
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
-            itemCount: blogs.length,
-            itemBuilder: (context, i) {
-              final blog = blogs[i];
-              final currentUid = _uid!;
-              final isLiked = blog.likes.contains(currentUid);
-
-              return BlogTile(
-                blog: blog,
-                isLiked: isLiked,
-                onLike: () => _blogSvc.toggleLike(
-                  blogId: blog.blogid,
-                  uid: currentUid,
-                  alreadyLiked: isLiked,
-                ),
-                onTap: () => Navigator.pushNamed(
-                  context,
-                  '/blogDetail',
-                  arguments: blog.blogid,
-                ),
-              );
+           return ShaderMask(
+            shaderCallback: (Rect bounds) {
+              return const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.purple, Colors.transparent, Colors.transparent, Colors.purple],
+                stops: [0.0, 0.02, 0.95, 1.0], 
+              ).createShader(bounds);
             },
+            blendMode: BlendMode.dstOut,
+            child: CupertinoScrollbar(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(0, 16, 0, 100), 
+                itemCount: blogs.length,
+                itemBuilder: (context, i) {
+                  final blog = blogs[i];
+                  final currentUid = _uid!;
+                  final isLiked = blog.likes.contains(currentUid);
+                  
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: Duration(milliseconds: 500 + (i * 100).clamp(0, 500)),
+                    curve: Curves.easeOut,
+                    builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: BlogTile(
+                        blog: blog,
+                        isLiked: isLiked,
+                        onLike: () => _blogSvc.toggleLike(
+                          blogId: blog.blogid,
+                          uid: currentUid,
+                          alreadyLiked: isLiked,
+                        ),
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          '/blogDetail',
+                          arguments: blog.blogid,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           );
         },
       ),
     );
+  }
+  
+   Widget _buildSkeletonItem() {
+      final theme = Theme.of(context);
+      return Container(
+         margin: const EdgeInsets.symmetric(horizontal: 16),
+         padding: const EdgeInsets.all(20),
+         decoration: BoxDecoration(
+           color: theme.cardColor,
+           borderRadius: BorderRadius.circular(20),
+           border: Border.all(color: theme.dividerColor.withOpacity(0.05)),
+         ),
+        child: const Column(
+          children: [
+             Row(children: [Skeleton.circle(size: 40), SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Skeleton(width: 100, height: 14), SizedBox(height: 4), Skeleton(width: 60, height: 10)])]),
+            SizedBox(height: 16),
+            Skeleton(width: double.infinity, height: 16),
+            SizedBox(height: 8),
+            Skeleton(width: 200, height: 16),
+          ],
+        ),
+     );
   }
 }

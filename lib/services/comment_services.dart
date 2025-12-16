@@ -24,12 +24,12 @@ class CommentService {
         .add({
           'authorId': user.uid,
           'authorName': user.username,
-          'authorPicUrl': user.profilepicurl,
+          'authorPicUrl': user.profilePicUrl,
           'content': text.trim(),
           'timestamp': FieldValue.serverTimestamp(),
         });
 
-    await ref.update({'commentId': ref.id});
+
 
     await FirebaseFirestore.instance.collection('blogs').doc(blogId).update({
       'commentCount': FieldValue.increment(1),
