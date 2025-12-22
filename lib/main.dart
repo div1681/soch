@@ -95,11 +95,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           opacity: _opacity,
           child: Text(
             'SOCH.',
-            style: GoogleFonts.bodoniModa(
-              fontSize: 48,
+            style: GoogleFonts.outfit(
+              fontSize: 56,
               fontWeight: FontWeight.w900,
               color: AppTheme.accent,
-              letterSpacing: 4.0,
+              letterSpacing: 8.0, 
             ),
           ),
         ),

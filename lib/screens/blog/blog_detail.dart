@@ -192,11 +192,12 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerPr
           backgroundColor: theme.scaffoldBackgroundColor,
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showAddCommentSheet(blog.blogid),
-            backgroundColor: theme.colorScheme.primary,
+            // Minimal FAB
+            backgroundColor: AppTheme.accent,
             foregroundColor: Colors.white,
             elevation: 4,
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text("Discuss"),
+            icon: const Icon(Icons.mode_comment_outlined, size: 20),
+            label: Text("Discuss", style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           ),
           body: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
@@ -206,121 +207,124 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerPr
             child: Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced margin to 16
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 80), // Space for Back Button
+                    const SizedBox(height: 100), // Space for Back Button + Top margin
                     
+                    // Simple Category Text (No box)
                     if (blog.category.isNotEmpty) 
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: Text(
                           blog.category.toUpperCase(),
-                          style: GoogleFonts.plusJakartaSans(
+                          style: GoogleFonts.outfit(
                             color: AppTheme.accent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            letterSpacing: 1,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            letterSpacing: 1.2,
                           ),
                         ),
                       ),
               
+                    // Title: Big Serif
                     Text(
                       blog.title,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.merriweather(
                         fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
                         color: theme.textTheme.displayLarge?.color,
-                        letterSpacing: -0.5,
                       ),
                     ),
                     
                     const SizedBox(height: 24),
               
-                    // Author Row
+                    // Author Row - Minimal Editorial Style
                     GestureDetector(
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(uid: blog.authorid))),
                       child: Row(
                         children: [
                           CircleAvatar(
-                            radius: 20,
+                            radius: 18,
                             backgroundImage: blog.authorpicurl.isNotEmpty ? CachedNetworkImageProvider(blog.authorpicurl) : null,
+                            backgroundColor: Colors.grey.shade200,
                           ),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(blog.authorname, 
-                                    style: Theme.of(context).textTheme.labelLarge,
-                                    overflow: TextOverflow.ellipsis,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                blog.authorname.toUpperCase(), 
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  letterSpacing: 1.0,
+                                  color: theme.textTheme.bodyLarge?.color,
                                 ),
-                                Text(
-                                  timeago.format(blog.timestamp), // Time ago
-                                  style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              Text(
+                                timeago.format(blog.timestamp), 
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  color: Colors.grey,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                           
                            if (_uid != blog.authorid) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 12),
                               ScaleTransition(
                                 scale: _followScale!,
                                 child: InkWell(
                                   onTap: () => _onFollowTap(blog.authorid),
                                   borderRadius: BorderRadius.circular(20),
-                                  child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                      decoration: BoxDecoration(
-                                          color: (_isFollowing ?? false) ? theme.scaffoldBackgroundColor : theme.colorScheme.primary,
-                                          border: Border.all(color: theme.colorScheme.primary),
-                                          borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                          (_isFollowing ?? false) ? "Following" : "Follow",
-                                          style: TextStyle(
-                                              color: (_isFollowing ?? false) ? theme.colorScheme.primary : Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12
-                                          ),
+                                  child: Text(
+                                      (_isFollowing ?? false) ? "•  Following" : "•  Follow",
+                                      style: GoogleFonts.outfit(
+                                          color: (_isFollowing ?? false) ? Colors.grey : AppTheme.accent,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
                                       ),
                                   ),
                                 ),
                               ),
                           ],
               
-                          const SizedBox(width: 12),
+                          const Spacer(),
                           _buildLikeButton(blog, liked),
                         ],
                       ),
                     ),
               
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    Divider(color: theme.dividerColor.withOpacity(0.1)),
+                    const SizedBox(height: 24),
               
+                    // Content: Reading Serif
                     SelectableText(
                       blog.content,
-                      style: GoogleFonts.literata( 
+                      style: GoogleFonts.lora( 
                         fontSize: 18,
-                        height: 1.5, 
-                        color: theme.textTheme.bodyLarge?.color,
+                        height: 1.8, 
+                        color: theme.textTheme.bodyLarge?.color?.withOpacity(0.9),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
               
-                    const SizedBox(height: 48),
-                    const Divider(),
+                    const SizedBox(height: 60),
+                    Divider(color: theme.dividerColor.withOpacity(0.1)),
                     const SizedBox(height: 24),
                     
-                    Text("Comments", style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      "Discussion", 
+                      style: GoogleFonts.merriweather(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.bold
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     _buildCommentsList(blog.blogid),
                     const SizedBox(height: 80), 
@@ -328,12 +332,12 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerPr
                 ),
               ),
               
-              // Content Fade Gradient (Top)
+              // Fade Header Background (Optional, or just Keep clean)
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
-                height: 120,
+                height: 100,
                 child: IgnorePointer(
                   child: Container(
                     decoration: BoxDecoration(
@@ -341,7 +345,7 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerPr
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          theme.scaffoldBackgroundColor.withOpacity(1.0),
+                          theme.scaffoldBackgroundColor,
                           theme.scaffoldBackgroundColor.withOpacity(0.0),
                         ],
                       ),
@@ -350,27 +354,20 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> with SingleTickerPr
                 ),
               ),
 
-              // Custom Floating Back Button
+              // Custom Floating Back Button - Minimal
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 child: SafeArea(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                        onPressed: () => Navigator.pop(context),
-                         icon: Container(
-                           padding: const EdgeInsets.all(8),
-                           decoration: BoxDecoration(
-                             color: Theme.of(context).cardColor.withOpacity(0.8),
-                             shape: BoxShape.circle,
-                             boxShadow: [
-                               BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
-                             ]
-                           ),
-                           child: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
+                         icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
+                         style: IconButton.styleFrom(
+                           backgroundColor: theme.scaffoldBackgroundColor.withOpacity(0.5),
                          ),
                     ),
                   ),

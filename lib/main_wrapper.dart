@@ -9,6 +9,9 @@ import 'package:soch/services/notifications/notification_channel.dart';
 import 'package:soch/services/notifications/permission.dart';
 import 'package:soch/services/notifications/upload_fcm.dart';
 import 'package:soch/services/user_services.dart';
+import 'package:soch/widgets/skeleton_loader.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:soch/utils/app_theme.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -47,6 +50,23 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 bool _tokengenerated = false;
   
+  Widget _buildExtendedSplash(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, 
+      body: Center(
+        child: Text(
+          'SOCH.',
+          style: GoogleFonts.outfit(
+            fontSize: 56,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.accent,
+            letterSpacing: 8.0, 
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     
@@ -54,7 +74,7 @@ bool _tokengenerated = false;
       stream: AuthService().authStateChanges,
       builder: (context, authSnap) {
         if (authSnap.connectionState == ConnectionState.waiting) {
-          return const SizedBox(); // Just wait, don't show skeleton again
+          return _buildExtendedSplash(context);
         }
         if (!authSnap.hasData){
           _tokengenerated = false;
@@ -73,7 +93,7 @@ bool _tokengenerated = false;
           future: UserService().getCurrentUser(),
           builder: (context, userSnap) {
             if (userSnap.connectionState == ConnectionState.waiting) {
-              return const SizedBox(); 
+              return _buildExtendedSplash(context);
             }
             if (!userSnap.hasData) {
               return const Scaffold(
